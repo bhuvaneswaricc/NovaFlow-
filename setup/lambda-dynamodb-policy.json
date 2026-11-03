@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Scan",
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:DeleteItem"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-east-1:YOUR_ACCOUNT_ID:table/NovaFlowTasks",
+        "arn:aws:dynamodb:us-east-1:YOUR_ACCOUNT_ID:table/NovaFlowEvents",
+        "arn:aws:dynamodb:us-east-1:YOUR_ACCOUNT_ID:table/NovaFlowRoutine",
+        "arn:aws:dynamodb:us-east-1:YOUR_ACCOUNT_ID:table/NovaFlowReminders"
+      ]
+    }
+  ]
+}

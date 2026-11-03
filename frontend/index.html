@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>NovaFlow — Personal Planner</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --bg2: #0b1730;
+      --panel: rgba(16, 28, 51, .78);
+      --panel2: rgba(21, 36, 64, .9);
+      --text: #eef5ff;
+      --muted: #91a4c2;
+      --line: rgba(255, 255, 255, .09);
+      --accent: #7c5cff;
+      --accent2: #20d9ff;
+      --green: #39df9b;
+      --orange: #ffb84d;
+      --red: #ff6685;
+      --shadow: 0 22px 70px rgba(0, 0, 0, .28);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at 15% 10%, rgba(124, 92, 255, .20), transparent 28%), radial-gradient(circle at 85% 15%, rgba(32, 217, 255, .14), transparent 25%), linear-gradient(135deg, var(--bg), var(--bg2) 55%, #08101e);
+      min-height: 100vh
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit
+    }
+
+    .app {
+      display: flex;
+      min-height: 100vh
+    }
+
+    .sidebar {
+      width: 260px;
+      padding: 24px 16px;
+      border-right: 1px solid var(--line);
+      background: rgba(4, 11, 23, .72);
+      backdrop-filter: blur(22px);
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 5
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 10px 28px
+    }
+
+    .logoMark {
+      width: 42px;
+      height: 42px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      box-shadow: 0 10px 35px rgba(124, 92, 255, .35)
+    }
+
+    .logo b {
+      font-size: 19px
+    }
+
+    .logo small {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      margin-top: 2px
+    }
+
+    .nav {
+      display: grid;
+      gap: 7px
+    }
+
+    .nav button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 13px 14px;
+      border-radius: 14px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-weight: 700
+    }
+
+    .nav button:hover,
+    .nav button.active {
+      color: #fff;
+      background: linear-gradient(90deg, rgba(124, 92, 255, .2), rgba(32, 217, 255, .07));
+      border: 1px solid var(--line)
+    }
+
+    .sideBottom {
+      position: absolute;
+      bottom: 22px;
+      left: 16px;
+      right: 16px
+    }
+
+    .themeBtn {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 14px;
+      cursor: pointer
+    }
+
+    .main {
+      margin-left: 260px;
+      width: calc(100% - 260px);
+      padding: 28px;
+      max-width: 1600px
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 24px
+    }
+
+    .eyebrow {
+      color: var(--accent2);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase
+    }
+
+    .top h1 {
+      margin: 5px 0 0;
+      font-size: 30px
+    }
+
+    .clock {
+      padding: 12px 16px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 16px;
+      text-align: right;
+      box-shadow: var(--shadow)
+    }
+
+    .clock b {
+      display: block;
+      font-size: 19px
+    }
+
+    .clock span {
+      font-size: 11px;
+      color: var(--muted)
+    }
+
+    .page {
+      display: none
+    }
+
+    .page.active {
+      display: block
+    }
+
+    .grid {
+      display: grid;
+      gap: 18px
+    }
+
+    .stats {
+      grid-template-columns: repeat(4, minmax(0, 1fr))
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px)
+    }
+
+    .stat {
+      position: relative;
+      overflow: hidden
+    }
+
+    .stat:after {
+      content: "";
+      position: absolute;
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      right: -30px;
+      top: -35px;
+      background: rgba(124, 92, 255, .12)
+    }
+
+    .stat .label {
+      color: var(--muted);
+      font-size: 13px
+    }
+
+    .stat .value {
+      font-size: 30px;
+      font-weight: 850;
+      margin-top: 8px
+    }
+
+    .stat .mini {
+      font-size: 11px;
+      color: var(--green);
+      margin-top: 5px
+    }
+
+    .progress {
+      height: 8px;
+      background: rgba(255, 255, 255, .07);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-top: 12px
+    }
+
+    .progress i {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      border-radius: 99px
+    }
+
+    .two {
+      grid-template-columns: 1.4fr .8fr;
+      margin-top: 18px
+    }
+
+    .sectionTitle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px
+    }
+
+    .sectionTitle h2 {
+      font-size: 18px;
+      margin: 0
+    }
+
+    .sectionTitle span {
+      font-size: 12px;
+      color: var(--muted)
+    }
+
+    .btn {
+      border: 0;
+      background: linear-gradient(135deg, var(--accent), #5b8cff);
+      color: white;
+      padding: 10px 15px;
+      border-radius: 12px;
+      font-weight: 800;
+      cursor: pointer
+    }
+
+    .btn.secondary {
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid var(--line)
+    }
+
+    .btn.danger {
+      background: rgba(255, 102, 133, .13);
+      color: #ff91a8;
+      border: 1px solid rgba(255, 102, 133, .2)
+    }
+
+    .task {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line)
+    }
+
+    .task:last-child {
+      border-bottom: 0
+    }
+
+    .check {
+      width: 22px;
+      height: 22px;
+      border-radius: 7px;
+      border: 1px solid #53627d;
+      cursor: pointer;
+      background: transparent;
+      color: #fff
+    }
+
+    .check.done {
+      background: linear-gradient(135deg, var(--green), #16b981);
+      border: 0
+    }
+
+    .taskMain {
+      flex: 1
+    }
+
+    .taskMain b {
+      display: block
+    }
+
+    .taskMain small {
+      color: var(--muted)
+    }
+
+    .pill {
+      font-size: 10px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(124, 92, 255, .14);
+      color: #b9adff
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 25px 5px;
+      text-align: center
+    }
+
+    .calendarToolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap
+    }
+
+    .calendarToolbar select,
+    .calendarToolbar button {
+      background: rgba(255, 255, 255, .05);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 9px 11px;
+      border-radius: 10px;
+      cursor: pointer
+    }
+
+    .calendarToolbar select option {
+      background: #111c30
+    }
+
+    .calendar {
+      margin-top: 18px
+    }
+
+    .week {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px
+    }
+
+    .weekday {
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 800;
+      padding: 8px
+    }
+
+    .day {
+      min-height: 105px;
+      background: rgba(255, 255, 255, .025);
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      padding: 10px;
+      cursor: pointer;
+      transition: .18s;
+      position: relative
+    }
+
+    .day:hover {
+      transform: translateY(-2px);
+      border-color: rgba(124, 92, 255, .5);
+      background: rgba(124, 92, 255, .07)
+    }
+
+    .day.muted {
+      opacity: .32
+    }
+
+    .day.today {
+      outline: 2px solid rgba(32, 217, 255, .55)
+    }
+
+    .day.selected {
+      background: linear-gradient(145deg, rgba(124, 92, 255, .18), rgba(32, 217, 255, .06))
+    }
+
+    .num {
+      font-weight: 850
+    }
+
+    .eventDot {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 9px;
+      font-size: 10px;
+      color: #cdd8ed;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent2);
+      flex: none
+    }
+
+    .important .dot {
+      background: var(--orange)
+    }
+
+    .notePreview {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis
+    }
+
+    .routineRow {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      padding: 13px 0;
+      border-bottom: 1px solid var(--line)
+    }
+
+    .time {
+      font-weight: 850;
+      width: 70px;
+      color: var(--accent2)
+    }
+
+    .routineRow .grow {
+      flex: 1
+    }
+
+    .iconBtn {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--muted);
+      border-radius: 9px;
+      padding: 7px 9px;
+      cursor: pointer
+    }
+
+    .iconBtn:hover {
+      color: white
+    }
+
+    .form {
+      display: grid;
+      gap: 13px
+    }
+
+    .form label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700
+    }
+
+    .form input,
+    .form select,
+    .form textarea {
+      width: 100%;
+      margin-top: 6px;
+      padding: 11px 12px;
+      background: rgba(255, 255, 255, .045);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      color: var(--text);
+      outline: none
+    }
+
+    .form textarea {
+      min-height: 90px;
+      resize: vertical
+    }
+
+    .form input:focus,
+    .form select:focus,
+    .form textarea:focus {
+      border-color: rgba(124, 92, 255, .7)
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(1, 5, 12, .72);
+      backdrop-filter: blur(10px);
+      display: none;
+      place-items: start center;
+      z-index: 20;
+      padding: 20px;
+      overflow-y: auto;
+      overscroll-behavior: contain
+    }
+
+    .modal.open {
+      display: grid
+    }
+
+    .modalBox {
+      width: min(560px, 100%);
+      max-height: calc(100vh - 40px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      background: #101c31;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 22px;
+      box-shadow: 0 30px 100px rgba(0, 0, 0, .55);
+      margin: auto 0
+    }
+
+    .modalBox .actions {
+      position: sticky;
+      bottom: -22px;
+      background: #101c31;
+      padding: 12px 0 2px;
+      z-index: 2
+    }
+
+    .light .modalBox .actions {
+      background: #fff
+    }
+
+    .modalHead {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px
+    }
+
+    .modalHead h3 {
+      margin: 0
+    }
+
+    .close {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 24px;
+      cursor: pointer
+    }
+
+    .actions {
+      display: flex;
+      gap: 9px;
+      justify-content: flex-end;
+      margin-top: 15px
+    }
+
+    .reminderToggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 46px;
+      color: #dbe6ff !important;
+      font-weight: 800 !important;
+      background: rgba(124, 92, 255, .08);
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      cursor: pointer
+    }
+
+    .reminderToggle input {
+      flex: 0 0 auto
+    }
+
+    .form {
+      min-width: 0
+    }
+
+    .historyBar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 8px;
+      align-items: end
+    }
+
+    .hist {
+      height: 130px;
+      display: flex;
+      flex-direction: column;
+      justify-content: end;
+      gap: 6px;
+      text-align: center
+    }
+
+    .hist i {
+      display: block;
+      background: linear-gradient(var(--accent), var(--accent2));
+      border-radius: 7px 7px 3px 3px;
+      min-height: 5px
+    }
+
+    .hist small {
+      color: var(--muted)
+    }
+
+    .light {
+      --bg: #eef3ff;
+      --bg2: #e8efff;
+      --panel: rgba(255, 255, 255, .72);
+      --panel2: #fff;
+      --text: #18233b;
+      --muted: #66738b;
+      --line: rgba(35, 54, 90, .12);
+      background: radial-gradient(circle at 10% 0%, #d9d0ff, transparent 28%), radial-gradient(circle at 90% 10%, #c9f7ff, transparent 25%), linear-gradient(135deg, #eef3ff, #f8fbff)
+    }
+
+    .light .sidebar {
+      background: rgba(255, 255, 255, .7)
+    }
+
+    .light .day {
+      background: rgba(255, 255, 255, .45)
+    }
+
+    .light .modalBox {
+      background: #fff
+    }
+
+    .light .calendarToolbar select option {
+      background: #fff;
+      color: #18233b
+    }
+
+    @media(max-width:1050px) {
+      .stats {
+        grid-template-columns: repeat(2, 1fr)
+      }
+
+      .two {
+        grid-template-columns: 1fr
+      }
+    }
+
+    @media(max-width:760px) {
+      .sidebar {
+        position: fixed;
+        width: 76px;
+        padding: 16px 10px
+      }
+
+      .logo {
+        justify-content: center;
+        padding-bottom: 20px
+      }
+
+      .logo div:last-child,
+      .nav button span,
+      .sideBottom {
+        display: none
+      }
+
+      .nav button {
+        justify-content: center;
+        padding: 13px
+      }
+
+      .main {
+        margin-left: 76px;
+        width: calc(100% - 76px);
+        padding: 18px
+      }
+
+      .top h1 {
+        font-size: 23px
+      }
+
+      .clock {
+        display: none
+      }
+
+      .stats {
+        grid-template-columns: 1fr 1fr
+      }
+
+      .day {
+        min-height: 78px;
+        padding: 7px
+      }
+
+      .weekday {
+        font-size: 9px
+      }
+
+      .notePreview {
+        display: none
+      }
+    }
+
+    @media(max-width:500px) {
+      .stats {
+        grid-template-columns: 1fr
+      }
+
+      .week {
+        gap: 3px
+      }
+
+      .day {
+        min-height: 62px
+      }
+
+      .eventDot {
+        font-size: 8px
+      }
+
+      .eventDot span:last-child {
+        display: none
+      }
+
+      .calendarToolbar {
+        width: 100%
+      }
+
+      .calendarToolbar select {
+        flex: 1
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logoMark">N</div>
+        <div><b>NovaFlow</b><small>Personal Planner</small></div>
+      </div>
+      <nav class="nav">
+        <button class="active" data-page="dashboard">⌂ <span>Dashboard</span></button>
+        <button data-page="tasks">✓ <span>My Tasks</span></button>
+        <button data-page="calendar">▦ <span>Calendar</span></button>
+        <button data-page="routine">◷ <span>Daily Routine</span></button>
+        <button data-page="progress">↗ <span>Progress</span></button>
+      </nav>
+      <div class="sideBottom"><button class="themeBtn" id="themeBtn">☼ &nbsp; Change Theme</button></div>
+    </aside>
+
+    <main class="main">
+      <header class="top">
+        <div>
+          <div class="eyebrow">PERSONAL COMMAND CENTER</div>
+          <h1 id="greeting">Good Morning 👋</h1>
+        </div>
+        <div class="clock"><b id="clock">--:--:--</b><span id="todayLabel"></span></div>
+      </header>
+
+      <section class="page active" id="dashboard">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="label">Today's Progress</div>
+            <div class="value" id="dashProgress">0%</div>
+            <div class="progress"><i id="dashBar" style="width:0%"></i></div>
+          </div>
+          <div class="card stat">
+            <div class="label">Tasks Today</div>
+            <div class="value" id="dashTasks">0</div>
+            <div class="mini" id="dashDone">0 completed</div>
+          </div>
+          <div class="card stat">
+            <div class="label">Important Events</div>
+            <div class="value" id="dashEvents">0</div>
+            <div class="mini">Saved in your calendar</div>
+          </div>
+          <div class="card stat">
+            <div class="label">Current Streak</div>
+            <div class="value" id="dashStreak">0 🔥</div>
+            <div class="mini">Keep going!</div>
+          </div>
+        </div>
+        <div class="grid two">
+          <div class="card">
+            <div class="sectionTitle">
+              <h2>Today's Focus</h2><button class="btn" onclick="openTask()">+ Add Task</button>
+            </div>
+            <div id="dashTaskList"></div>
+          </div>
+          <div class="card">
+            <div class="sectionTitle">
+              <h2>Upcoming</h2><span>Next 7 days</span>
+            </div>
+            <div id="upcoming"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="page" id="tasks">
+        <div class="card">
+          <div class="sectionTitle">
+            <h2>My Tasks</h2><button class="btn" onclick="openTask()">+ New Task</button>
+          </div>
+          <div id="taskList"></div>
+        </div>
+      </section>
+
+      <section class="page" id="calendar">
+        <div class="card">
+          <div class="sectionTitle">
+            <div>
+              <h2>Smart Calendar</h2><span>Plan any date, any month, any year</span>
+            </div>
+            <button class="btn" onclick="openEvent()">+ Add Important Date</button>
+          </div>
+          <div class="calendarToolbar">
+            <button onclick="changeMonth(-1)">←</button><select id="monthSelect"></select><select
+              id="yearSelect"></select><button onclick="changeMonth(1)">→</button><button class="btn secondary"
+              onclick="goToday()">Today</button>
+          </div>
+          <div class="calendar">
+            <div class="week" id="weekdays"></div>
+            <div class="week" id="calendarGrid"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px">
+          <div class="sectionTitle">
+            <h2 id="selectedTitle">Selected Date</h2><button class="btn secondary" onclick="openEvent()">+ Note /
+              Reminder</button>
+          </div>
+          <div id="selectedDetails"></div>
+        </div>
+      </section>
+
+      <section class="page" id="routine">
+        <div class="card">
+          <div class="sectionTitle">
+            <div>
+              <h2>My Daily Routine</h2><span>Customize your personal routine</span>
+            </div><button class="btn" onclick="openRoutine()">+ Add Routine</button>
+          </div>
+          <div id="routineList"></div>
+        </div>
+      </section>
+
+      <section class="page" id="progress">
+        <div class="grid stats">
+          <div class="card stat">
+            <div class="label">Overall Completion</div>
+            <div class="value" id="overall">0%</div>
+          </div>
+          <div class="card stat">
+            <div class="label">Completed</div>
+            <div class="value" id="completedTotal">0</div>
+          </div>
+          <div class="card stat">
+            <div class="label">Remaining</div>
+            <div class="value" id="remainingTotal">0</div>
+          </div>
+          <div class="card stat">
+            <div class="label">Best Streak</div>
+            <div class="value" id="bestStreak">0 🔥</div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:18px">
+          <div class="sectionTitle">
+            <h2>Last 7 Days</h2><span>Completion activity</span>
+          </div>
+          <div class="historyBar" id="history"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal" id="taskModal">
+    <div class="modalBox">
+      <div class="modalHead">
+        <h3 id="taskModalTitle">New Task</h3><button class="close" onclick="closeModal('taskModal')">×</button>
+      </div>
+      <div class="form">
+        <label>Task name<input id="taskName" placeholder="What needs to be done?"></label>
+        <label>Date<input id="taskDate" type="date"></label>
+        <label>Time<input id="taskTime" type="time"></label>
+        <label>Priority<select id="taskPriority">
+            <option>Low</option>
+            <option selected>Medium</option>
+            <option>High</option>
+          </select></label>
+        <label>Category<select id="taskCategory">
+            <option>Personal</option>
+            <option>Work</option>
+            <option>Study</option>
+            <option>Fitness</option>
+            <option>Shopping</option>
+            <option>Important</option>
+          </select></label>
+        <label>Notes<textarea id="taskNotes" placeholder="Small notes..."></textarea></label>
+        <label class="reminderToggle"><input id="taskEmailReminder" type="checkbox" style="width:auto;margin-right:8px">
+          📧 Email Reminder</label>
+        <label id="taskReminderWrap" style="display:none">Remind me<select id="taskReminder">
+            <option value="10">10 minutes before</option>
+            <option value="30" selected>30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="1440">1 day before</option>
+            <option value="2880">2 days before</option>
+          </select></label>
+      </div>
+      <div class="actions"><button class="btn secondary" onclick="closeModal('taskModal')">Cancel</button><button
+          class="btn" onclick="saveTask()">Save Task</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="eventModal">
+    <div class="modalBox">
+      <div class="modalHead">
+        <h3 id="eventModalTitle">Important Date</h3><button class="close" onclick="closeModal('eventModal')">×</button>
+      </div>
+      <div class="form">
+        <label>Date<input id="eventDate" type="date"></label><label>Time<input id="eventTime" type="time"></label>
+        <label>Title<input id="eventTitle" placeholder="Birthday, meeting, exam, reminder..."></label>
+        <label>Type<select id="eventType">
+            <option>Important</option>
+            <option>Reminder</option>
+            <option>Meeting</option>
+            <option>Personal</option>
+            <option>Holiday</option>
+          </select></label>
+        <label>Notes<textarea id="eventNotes" placeholder="Add your reminder or note..."></textarea></label>
+        <label><input id="eventEmailReminder" type="checkbox" style="width:auto;margin-right:8px"> 📧 Email
+          Reminder</label>
+        <label id="eventReminderWrap" style="display:none">Remind me<select id="eventReminder">
+            <option value="10">10 minutes before</option>
+            <option value="30" selected>30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="1440">1 day before</option>
+            <option value="2880">2 days before</option>
+          </select></label>
+      </div>
+      <div class="actions"><button class="btn danger" id="deleteEventBtn" onclick="deleteEvent()"
+          style="display:none;margin-right:auto">Delete</button><button class="btn secondary"
+          onclick="closeModal('eventModal')">Cancel</button><button class="btn" onclick="saveEvent()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="routineModal">
+    <div class="modalBox">
+      <div class="modalHead">
+        <h3 id="routineModalTitle">Add Routine</h3><button class="close" onclick="closeModal('routineModal')">×</button>
+      </div>
+      <div class="form">
+        <label>Time<input id="routineTime" type="time"></label><label>Routine name<input id="routineName"
+            placeholder="Exercise, reading..."></label><label>Category<select id="routineCategory">
+            <option>Personal</option>
+            <option>Work</option>
+            <option>Study</option>
+            <option>Fitness</option>
+            <option>Important</option>
+          </select></label>
+      </div>
+      <div class="actions"><button class="btn secondary" onclick="closeModal('routineModal')">Cancel</button><button
+          class="btn" onclick="saveRoutine()">Save Routine</button></div>
+    </div>
+  </div>
+
+  <script>
+
+    /*
+     NOVAFLOW EMAIL REMINDER BACKEND
+     --------------------------------
+     Set this URL after creating your AWS API Gateway endpoint:

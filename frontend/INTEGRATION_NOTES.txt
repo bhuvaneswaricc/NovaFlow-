@@ -1,0 +1,20 @@
+NOVAFLOW FRONTEND INTEGRATION NOTES
+
+A. Fix the syntax error:
+Replace the broken two-line declaration:
+function
+
+openTask(id = null) {
+with:
+function openTask(id = null) {
+
+B. Verify API base URL:
+const NOVAFLOW_API_URL = "https://i0odif6t7e.execute-api.us-east-1.amazonaws.com";
+Use the exact Invoke URL shown in API Gateway. Add /prod only if the displayed invoke URL includes that stage.
+
+C. The supplied frontend currently persists tasks locally after a successful AWS request, but events and routines are localStorage-only.
+The backend in this ZIP supports /events and /routines, but the frontend still needs GET/POST/PUT/DELETE fetch calls for those resources. It also needs to load AWS records during startup before renderAll().
+Do not delete localStorage data until you have successfully migrated it and verified the records in DynamoDB.
+
+D. Reminder records are stored in /reminders only when the frontend calls POST /reminders.
+The current syncReminderToAWS() function does this for opted-in task/event reminders, but only after a task/event is saved. This backend does not yet send email. For actual email delivery, configure EventBridge Scheduler + Amazon SES separately.

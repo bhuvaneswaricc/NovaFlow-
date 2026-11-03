@@ -1,0 +1,16 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /tasks",
+  "rawPath": "/tasks",
+  "requestContext": {
+    "http": {
+      "method": "POST",
+      "path": "/tasks"
+    }
+  },
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"id\": \"test-task-001\", \"name\": \"Test NovaFlow task\", \"date\": \"2026-11-02\", \"time\": \"18:00\", \"priority\": \"High\", \"category\": \"Personal\", \"notes\": \"Check DynamoDB save\", \"done\": false}",
+  "isBase64Encoded": false
+}

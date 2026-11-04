@@ -994,7 +994,308 @@
 
   <script>
 
-    /*
-     NOVAFLOW EMAIL REMINDER BACKEND
-     --------------------------------
-     Set this URL after creating your AWS API Gateway endpoint:
+    // AWS API Gateway base URL (no /prod stage in the confirmed Invoke URL).
+    const NOVAFLOW_API_URL = "https://i0odif6t7e.execute-api.us-east-1.amazonaws.com";
+
+    function createId() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+      return "nf-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+    }
+
+    async function apiRequest(resource, method = "GET", data = null, id = null) {
+      const url = new URL(`${NOVAFLOW_API_URL}/${resource}`);
+      if (id) url.searchParams.set("id", id);
+      const options = { method, headers: { "Content-Type": "application/json" } };
+      if (data) options.body = JSON.stringify(data);
+      const response = await fetch(url.toString(), options);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || result.success === false) {
+        throw new Error(result.detail || result.error || `API ${method} ${resource} failed (${response.status})`);
+      }
+      return result;
+    }
+
+    async function syncReminderToAWS(item) {
+      if (!item.emailReminder || !item.date || !item.time) return;
+      try {
+        await apiRequest("reminders", "POST", {
+          id: String(item.id),
+          type: item.title ? "event" : "task",
+          title: item.title || item.name,
+          date: item.date,
+          time: item.time,
+          notes: item.notes || "",
+          reminderMinutes: Number(item.reminderMinutes || 30)
+        });
+      } catch (err) {
+        console.warn("Reminder sync failed:", err);
+        alert("Your item was saved, but its reminder could not be synced to AWS: " + err.message);
+      }
+    }
+
+    const $ = id => document.getElementById(id);
+    const todayISO = () => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    };
+    let tasks = JSON.parse(localStorage.getItem('novaflow_tasks') || '[]');
+    let events = JSON.parse(localStorage.getItem('novaflow_events') || '[]');
+    let routine = JSON.parse(localStorage.getItem('novaflow_routine') || 'null');
+    let selectedDate = todayISO(), editTaskId = null, editEventId = null, editRoutineId = null;
+    let viewDate = new Date();
+
+    if (!routine) routine = [
+      {id: createId(), time: '06:00', name: 'Wake up', category: 'Personal', done: false},
+      {id: createId(), time: '06:30', name: 'Exercise', category: 'Fitness', done: false},
+      {id: createId(), time: '08:00', name: 'Breakfast', category: 'Personal', done: false},
+      {id: createId(), time: '09:00', name: 'Work / Study', category: 'Work', done: false},
+      {id: createId(), time: '13:00', name: 'Lunch', category: 'Personal', done: false},
+      {id: createId(), time: '18:00', name: 'Walk', category: 'Fitness', done: false},
+      {id: createId(), time: '21:00', name: 'Reading', category: 'Study', done: false},
+      {id: createId(), time: '22:30', name: 'Sleep', category: 'Personal', done: false}
+    ];
+    function persist() {localStorage.setItem('novaflow_tasks', JSON.stringify(tasks)); localStorage.setItem('novaflow_events', JSON.stringify(events)); localStorage.setItem('novaflow_routine', JSON.stringify(routine));}
+
+    async function loadResourceFromAWS(resource, localItems) {
+      try {
+        const result = await apiRequest(resource, "GET");
+        const cloudItems = Array.isArray(result.items) ? result.items :
+          (Array.isArray(result[resource]) ? result[resource] : []);
+        const cloudIds = new Set(cloudItems.map(item => String(item.id)));
+        const localOnly = localItems.filter(item => !cloudIds.has(String(item.id)));
+        // Upload only local records absent from DynamoDB; never overwrite cloud records on startup.
+        for (const item of localOnly) {
+          await apiRequest(resource, "POST", item);
+        }
+        return { items: [...cloudItems, ...localOnly], ok: true };
+      } catch (error) {
+        console.error(`AWS ${resource} load/migration failed:`, error);
+        return { items: localItems, ok: false, error };
+      }
+    }
+
+    async function initializeFromAWS() {
+      const [taskResult, eventResult, routineResult] = await Promise.all([
+        loadResourceFromAWS("tasks", tasks),
+        loadResourceFromAWS("events", events),
+        loadResourceFromAWS("routines", routine)
+      ]);
+      tasks = taskResult.items;
+      events = eventResult.items;
+      routine = routineResult.items;
+      persist();
+      renderAll();
+      const failed = [
+        !taskResult.ok && "Tasks",
+        !eventResult.ok && "Calendar events",
+        !routineResult.ok && "Routines"
+      ].filter(Boolean);
+      if (failed.length) {
+        console.warn("Some data could not be loaded from AWS:", failed.join(", "));
+      }
+    }
+    function formatDate(s) {return new Date(s + 'T00:00:00').toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'})}
+    function updateClock() {let d = new Date(), h = d.getHours(), g = h < 12 ? 'Good Morning 👋' : h < 17 ? 'Good Afternoon ☀️' : 'Good Evening 🌙'; $('greeting').textContent = g; $('clock').textContent = d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'}); $('todayLabel').textContent = d.toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'})}
+    setInterval(updateClock, 1000); updateClock();
+
+    document.querySelectorAll('.nav button').forEach(b => b.onclick = () => {document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active')); b.classList.add('active'); document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); $(b.dataset.page).classList.add('active'); renderAll()});
+    $('themeBtn').onclick = () => {document.body.classList.toggle('light'); localStorage.setItem('novaflow_theme', document.body.classList.contains('light') ? 'light' : 'dark')};
+    if (localStorage.getItem('novaflow_theme') === 'light') document.body.classList.add('light');
+
+    function openModal(id) {$(id).classList.add('open')} function closeModal(id) {$(id).classList.remove('open')}
+    function openTask(id = null) {editTaskId = id; $('taskModalTitle').textContent = id ? 'Edit Task' : 'New Task'; let t = tasks.find(x => x.id === id); $('taskName').value = t?.name || ''; $('taskDate').value = t?.date || selectedDate; $('taskTime').value = t?.time || ''; $('taskPriority').value = t?.priority || 'Medium'; $('taskCategory').value = t?.category || 'Personal'; $('taskNotes').value = t?.notes || ''; $('taskEmailReminder').checked = !!t?.emailReminder; $('taskReminder').value = t?.reminderMinutes || '30'; toggleReminderUI(); openModal('taskModal')}
+    async function saveTask() {
+      const name = $("taskName").value.trim();
+      if (!name) return alert("Please enter a task name.");
+      const previous = tasks.find(x => x.id === editTaskId);
+      const obj = {
+        id: editTaskId || createId(),
+        name,
+        date: $("taskDate").value || todayISO(),
+        time: $("taskTime").value,
+        priority: $("taskPriority").value,
+        category: $("taskCategory").value,
+        notes: $("taskNotes").value,
+        emailReminder: $("taskEmailReminder").checked,
+        reminderMinutes: Number($("taskReminder").value || 30),
+        done: previous?.done || false
+      };
+      try {
+        await apiRequest("tasks", editTaskId ? "PUT" : "POST", obj);
+        tasks = editTaskId ? tasks.map(x => x.id === editTaskId ? obj : x) : [...tasks, obj];
+        persist();
+        closeModal("taskModal");
+        renderAll();
+        await syncReminderToAWS(obj);
+      } catch (error) {
+        console.error("Task save API error:", error);
+        alert("AWS task save failed. The task was not saved. Please check the API and try again.\n\n" + error.message);
+      }
+    }
+
+    async function toggleTask(id) {
+      const old = tasks.find(t => t.id === id);
+      if (!old) return;
+      const updated = { ...old, done: !old.done };
+      try {
+        await apiRequest("tasks", "PUT", updated);
+        tasks = tasks.map(t => t.id === id ? updated : t);
+        persist();
+        renderAll();
+      } catch (error) {
+        console.error("Task update API error:", error);
+        alert("Could not update this task in AWS. Please try again.\n\n" + error.message);
+      }
+    }
+
+    async function deleteTask(id) {
+      if (!confirm("Delete this task?")) return;
+      try {
+        await apiRequest("tasks", "DELETE", null, id);
+        tasks = tasks.filter(task => task.id !== id);
+        persist();
+        renderAll();
+        console.log("Task deleted successfully");
+      } catch (error) {
+        console.error("Delete API error:", error);
+        alert("Unable to delete task from AWS. Please try again.\n\n" + error.message);
+      }
+    }
+
+    function taskHTML(t) {return `<div class="task"><button class="check ${t.done ? 'done' : ''}" onclick="toggleTask('${t.id}')">${t.done ? '✓' : ''}</button><div class="taskMain"><b style="${t.done ? 'text-decoration:line-through;opacity:.55' : ''}">${esc(t.name)}</b><small>${t.time || 'No time'} · ${esc(t.category)}${t.notes ? ' · ' + esc(t.notes) : ''}</small></div><span class="pill">${t.priority}</span><button class="iconBtn" onclick="openTask('${t.id}')">✎</button><button class="iconBtn" onclick="deleteTask('${t.id}')">×</button></div>`}
+
+    function openEvent(id = null) {editEventId = id; let e = events.find(x => x.id === id); $('eventModalTitle').textContent = id ? 'Edit Important Date' : 'Important Date'; $('eventDate').value = e?.date || selectedDate; $('eventTime').value = e?.time || ''; $('eventTitle').value = e?.title || ''; $('eventType').value = e?.type || 'Important'; $('eventNotes').value = e?.notes || ''; $('eventEmailReminder').checked = !!e?.emailReminder; $('eventReminder').value = e?.reminderMinutes || '30'; toggleReminderUI(); $('deleteEventBtn').style.display = id ? 'block' : 'none'; openModal('eventModal')}
+    async function saveEvent() {
+      const title = $("eventTitle").value.trim();
+      if (!title) return alert("Please enter a title.");
+      const obj = {
+        id: editEventId || createId(),
+        date: $("eventDate").value || todayISO(),
+        time: $("eventTime").value,
+        title,
+        type: $("eventType").value,
+        notes: $("eventNotes").value,
+        emailReminder: $("eventEmailReminder").checked,
+        reminderMinutes: Number($("eventReminder").value || 30)
+      };
+      try {
+        await apiRequest("events", editEventId ? "PUT" : "POST", obj);
+        events = editEventId ? events.map(x => x.id === editEventId ? obj : x) : [...events, obj];
+        selectedDate = obj.date;
+        viewDate = new Date(obj.date + "T00:00:00");
+        persist();
+        closeModal("eventModal");
+        renderAll();
+        await syncReminderToAWS(obj);
+      } catch (error) {
+        console.error("Event save API error:", error);
+        alert("AWS calendar event save failed. Please check the API and try again.\n\n" + error.message);
+      }
+    }
+
+    async function deleteEvent() {
+      if (!editEventId || !confirm("Delete this event?")) return;
+      try {
+        await apiRequest("events", "DELETE", null, editEventId);
+        events = events.filter(x => x.id !== editEventId);
+        persist();
+        closeModal("eventModal");
+        renderAll();
+      } catch (error) {
+        console.error("Event delete API error:", error);
+        alert("Unable to delete this event from AWS. Please try again.\n\n" + error.message);
+      }
+    }
+
+    function buildCalendar() {
+      let y = viewDate.getFullYear(), m = viewDate.getMonth(); $('monthSelect').innerHTML = Array.from({length: 12}, (_, i) => `<option value="${i}" ${i === m ? 'selected' : ''}>${new Date(2000, i).toLocaleString(undefined, {month: 'long'})}</option>`).join(''); let ys = []; for (let i = y - 10; i <= y + 20; i++)ys.push(`<option ${i === y ? 'selected' : ''}>${i}</option>`); $('yearSelect').innerHTML = ys.join(''); $('monthSelect').onchange = () => {viewDate = new Date(+$('yearSelect').value, +$('monthSelect').value, 1); renderCalendar()}; $('yearSelect').onchange = () => {viewDate = new Date(+$('yearSelect').value, +$('monthSelect').value, 1); renderCalendar()};
+      $('weekdays').innerHTML = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(x => `<div class="weekday">${x}</div>`).join('');
+      let first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate(), prev = new Date(y, m, 0).getDate(), cells = [];
+      for (let i = 0; i < first; i++)cells.push({d: prev - first + i + 1, muted: true, date: iso(y, m - 1, prev - first + i + 1)});
+      for (let d = 1; d <= days; d++)cells.push({d, date: iso(y, m, d)});
+      let next = 1; while (cells.length < 42) cells.push({d: next++, muted: true, date: iso(y, m + 1, next - 1)});
+      $('calendarGrid').innerHTML = cells.map(c => {let es = events.filter(e => e.date === c.date), ts = tasks.filter(t => t.date === c.date); return `<div class="day ${c.muted ? 'muted' : ''} ${c.date === todayISO() ? 'today' : ''} ${c.date === selectedDate ? 'selected' : ''}" onclick="selectDate('${c.date}')"><div class="num">${c.d}</div>${es.slice(0, 2).map(e => `<div class="eventDot ${e.type === 'Important' ? 'important' : ''}"><i class="dot"></i><span>${e.time ? e.time + ' ' : ''}${esc(e.title)}</span></div>`).join('')}${ts.slice(0, 1).map(t => `<div class="eventDot"><i class="dot"></i><span>${esc(t.name)}</span></div>`).join('')}${es.length + ts.length > 2 ? `<div class="notePreview">+${es.length + ts.length - 2} more</div>` : ''}</div>`}).join('');
+    }
+    function iso(y, m, d) {
+      const x = new Date(y, m, d);
+      return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+    }
+    function selectDate(d) {selectedDate = d; let x = new Date(d + 'T00:00:00'); viewDate = x; renderCalendar(); renderSelected()}
+    function renderCalendar() {buildCalendar(); renderSelected()}
+    function changeMonth(n) {viewDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + n, 1); renderCalendar()}
+    function goToday() {selectedDate = todayISO(); viewDate = new Date(); renderCalendar()}
+
+    function renderSelected() {let es = events.filter(e => e.date === selectedDate), ts = tasks.filter(t => t.date === selectedDate); $('selectedTitle').textContent = formatDate(selectedDate); let out = ''; es.forEach(e => out += `<div class="task"><div class="taskMain"><b>⭐ ${esc(e.title)}</b><small>${e.time || 'No time'} · ${esc(e.type)}${e.notes ? ' · ' + esc(e.notes) : ''}</small></div><button class="iconBtn" onclick="openEvent('${e.id}')">✎ Edit</button></div>`); ts.forEach(t => out += taskHTML(t)); $('selectedDetails').innerHTML = out || '<div class="empty">No events or tasks for this date. Add your first reminder ✨</div>'}
+
+    function openRoutine(id = null) {editRoutineId = id; let r = routine.find(x => x.id === id); $('routineModalTitle').textContent = id ? 'Edit Routine' : 'Add Routine'; $('routineTime').value = r?.time || ''; $('routineName').value = r?.name || ''; $('routineCategory').value = r?.category || 'Personal'; openModal('routineModal')}
+    async function saveRoutine() {
+      const name = $("routineName").value.trim();
+      if (!name) return alert("Please enter a routine name.");
+      const previous = routine.find(x => x.id === editRoutineId);
+      const obj = {
+        id: editRoutineId || createId(),
+        time: $("routineTime").value || "09:00",
+        name,
+        category: $("routineCategory").value,
+        done: previous?.done || false
+      };
+      try {
+        await apiRequest("routines", editRoutineId ? "PUT" : "POST", obj);
+        routine = editRoutineId ? routine.map(x => x.id === editRoutineId ? obj : x) : [...routine, obj];
+        routine.sort((a, b) => a.time.localeCompare(b.time));
+        persist();
+        closeModal("routineModal");
+        renderAll();
+      } catch (error) {
+        console.error("Routine save API error:", error);
+        alert("AWS routine save failed. Please check the API and try again.\n\n" + error.message);
+      }
+    }
+
+    async function toggleRoutine(id) {
+      const old = routine.find(r => r.id === id);
+      if (!old) return;
+      const updated = { ...old, done: !old.done };
+      try {
+        await apiRequest("routines", "PUT", updated);
+        routine = routine.map(r => r.id === id ? updated : r);
+        persist();
+        renderAll();
+      } catch (error) {
+        console.error("Routine update API error:", error);
+        alert("Could not update this routine in AWS. Please try again.\n\n" + error.message);
+      }
+    }
+
+    async function deleteRoutine(id) {
+      if (!confirm("Delete this routine item?")) return;
+      try {
+        await apiRequest("routines", "DELETE", null, id);
+        routine = routine.filter(x => x.id !== id);
+        persist();
+        renderAll();
+      } catch (error) {
+        console.error("Routine delete API error:", error);
+        alert("Unable to delete this routine from AWS. Please try again.\n\n" + error.message);
+      }
+    }
+
+    function renderDashboard() {let d = todayISO(), ts = tasks.filter(t => t.date === d), done = ts.filter(t => t.done).length, p = ts.length ? Math.round(done / ts.length * 100) : 0; $('dashProgress').textContent = p + '%'; $('dashBar').style.width = p + '%'; $('dashTasks').textContent = ts.length; $('dashDone').textContent = done + ' completed'; $('dashEvents').textContent = events.filter(e => e.date >= d).length; $('dashStreak').textContent = calcStreak() + ' 🔥'; $('dashTaskList').innerHTML = ts.length ? ts.map(taskHTML).join('') : '<div class="empty">Your day is clear. Add a task to get started ✨</div>'; let now = new Date(), up = []; for (let i = 0; i < 7; i++) {let date = new Date(now); date.setDate(now.getDate() + i); let s = date.toISOString().slice(0, 10); events.filter(e => e.date === s).forEach(e => up.push({date: s, text: e.title, time: e.time})); tasks.filter(t => t.date === s && !t.done).slice(0, 2).forEach(t => up.push({date: s, text: t.name, time: t.time}))} $('upcoming').innerHTML = up.slice(0, 7).map(x => `<div class="task"><div class="taskMain"><b>${esc(x.text)}</b><small>${new Date(x.date + 'T00:00:00').toLocaleDateString(undefined, {month: 'short', day: 'numeric'})} · ${x.time || 'All day'}</small></div></div>`).join('') || '<div class="empty">Nothing upcoming 🎉</div>'}
+    function renderTasks() {$('taskList').innerHTML = tasks.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)).map(taskHTML).join('') || '<div class="empty">No tasks yet. Add one above.</div>'}
+    function renderRoutine() {$('routineList').innerHTML = routine.length ? routine.sort((a, b) => a.time.localeCompare(b.time)).map(r => `<div class="routineRow"><div class="time">${r.time}</div><button class="check ${r.done ? 'done' : ''}" onclick="toggleRoutine('${r.id}')">${r.done ? '✓' : ''}</button><div class="grow"><b style="${r.done ? 'text-decoration:line-through;opacity:.55' : ''}">${esc(r.name)}</b><small style="display:block;color:var(--muted)">${esc(r.category)}</small></div><button class="iconBtn" onclick="openRoutine('${r.id}')">✎</button><button class="iconBtn" onclick="deleteRoutine('${r.id}')">×</button></div>`).join('') : '<div class="empty">Create your personal routine.</div>'}
+    function renderProgress() {let total = tasks.length, done = tasks.filter(t => t.done).length; $('overall').textContent = (total ? Math.round(done / total * 100) : 0) + '%'; $('completedTotal').textContent = done; $('remainingTotal').textContent = total - done; $('bestStreak').textContent = calcStreak() + ' 🔥'; let a = []; for (let i = 6; i >= 0; i--) {let d = new Date(); d.setDate(d.getDate() - i); let s = d.toISOString().slice(0, 10), ts = tasks.filter(t => t.date === s), n = ts.length ? Math.round(ts.filter(t => t.done).length / ts.length * 100) : 0; a.push(`<div class="hist"><strong>${n}%</strong><i style="height:${Math.max(n, 4)}%"></i><small>${d.toLocaleDateString(undefined, {weekday: 'short'}).slice(0, 3)}</small></div>`)} $('history').innerHTML = a.join('')}
+    function calcStreak() {let streak = 0, d = new Date(); for (let i = 0; i < 365; i++) {let s = d.toISOString().slice(0, 10), ts = tasks.filter(t => t.date === s); if (ts.length && ts.every(t => t.done)) {streak++; d.setDate(d.getDate() - 1)} else break} return streak}
+    function renderAll() {renderDashboard(); renderTasks(); renderRoutine(); renderProgress(); renderCalendar()}
+    function toggleReminderUI() {
+      $('taskReminderWrap').style.display = $('taskEmailReminder').checked ? 'block' : 'none';
+      $('eventReminderWrap').style.display = $('eventEmailReminder').checked ? 'block' : 'none';
+    }
+    $('taskEmailReminder').addEventListener('change', toggleReminderUI);
+    $('eventEmailReminder').addEventListener('change', toggleReminderUI);
+
+    function esc(s) {return String(s ?? '').replace(/[&<>"']/g, m => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'}[m]))}
+    initializeFromAWS();
+  </script>
+</body>
+
+</html>
